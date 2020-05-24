@@ -14,6 +14,7 @@
 git clone -b v0.3.1 --depth 1 https://github.com/xiph/rav1e.git
 
 cd rav1e
+git apply ../rav1e-0.3.1-pr2324.patch
 cargo install cbindgen
 cbindgen -c cbindgen.toml -l C -o target/release/include/rav1e/rav1e.h --crate rav1e .
 
