@@ -41,43 +41,6 @@ if(AVIF_LOCAL_LIBGAV1)
     enable_language(CXX)
 endif()
 
-# ---------------------------------------------------------------------------------------
-# This insanity is for people embedding libavif or making fully static or Windows builds.
-# Any proper unix environment should ignore these entire following blocks.
-option(AVIF_LOCAL_ZLIBPNG "Build zlib and libpng by providing your own copy inside the ext subdir." OFF)
-if(AVIF_LOCAL_ZLIBPNG)
-    add_subdirectory(ext/zlib)
-    set(ZLIB_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ext/zlib")
-    include_directories("${CMAKE_CURRENT_BINARY_DIR}/ext/zlib")
-    set(CMAKE_DEBUG_POSTFIX "")
-
-    # This is the only way I could avoid libpng going crazy if it found awk.exe, seems benign otherwise
-    set(PREV_ANDROID ${ANDROID})
-    set(ANDROID TRUE)
-    set(PNG_BUILD_ZLIB "${CMAKE_CURRENT_SOURCE_DIR}/ext/zlib" CACHE STRING "" FORCE)
-    set(PNG_SHARED OFF CACHE BOOL "")
-    set(PNG_TESTS OFF CACHE BOOL "")
-    add_subdirectory(ext/libpng)
-    set(PNG_PNG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ext/libpng")
-    set(PNG_LIBRARY png_static)
-    include_directories("${CMAKE_CURRENT_BINARY_DIR}/ext/libpng")
-    set(ANDROID ${PREV_ANDROID})
-
-    set(ZLIB_LIBRARY zlibstatic)
-endif()
-option(AVIF_LOCAL_JPEG "Build jpeg by providing your own copy inside the ext subdir." OFF)
-if(AVIF_LOCAL_JPEG)
-    add_subdirectory(ext/libjpeg)
-    if("${CMAKE_SOURCE_DIR}" STREQUAL  "${CMAKE_CURRENT_SOURCE_DIR}")
-        set(JPEG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ext/libjpeg")
-        set(JPEG_LIBRARY jpeg)
-    else()
-        set(JPEG_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ext/libjpeg" PARENT_SCOPE)
-        set(JPEG_LIBRARY jpeg PARENT_SCOPE)
-    endif()
-endif()
-# ---------------------------------------------------------------------------------------
-
 # Enable all warnings
 if(CMAKE_C_COMPILER_ID MATCHES "Clang")
   MESSAGE(STATUS "libavif: Enabling warnings for Clang")
@@ -305,6 +268,20 @@ if(NOT SKIP_INSTALL_ALL)
     include(GNUInstallDirs)
 endif()
 
+# ---------------------------------------------------------------------------------------
+# This insanity is for people embedding libavif or making fully static or Windows builds.
+# Any proper unix environment should ignore these entire following blocks.
+option(AVIF_LOCAL_ZLIBPNG "Build zlib and libpng by providing your own copy inside the ext subdir." OFF)
+option(AVIF_LOCAL_JPEG "Build jpeg by providing your own copy inside the ext subdir." OFF)
+if(AVIF_LOCAL_ZLIBPNG)
+    set(ZLIB_ROOT "ext/zlib")
+    set(PNG_ROOT "ext/libpng")
+endif()
+if(AVIF_LOCAL_JPEG)
+    set(JPEG_ROOT "ext/libjpeg")
+endif()
+# ---------------------------------------------------------------------------------------
+
 option(AVIF_BUILD_APPS "Build avif apps." OFF)
 if(AVIF_BUILD_APPS)
     find_package(ZLIB REQUIRED)
@@ -323,13 +300,13 @@ if(AVIF_BUILD_APPS)
     if(AVIF_LOCAL_LIBGAV1)
         set_target_properties(avifenc PROPERTIES LINKER_LANGUAGE "CXX")
     endif()
-    target_link_libraries(avifenc avif ${AVIF_PLATFORM_LIBRARIES} ${ZLIB_LIBRARY} ${PNG_LIBRARY} ${JPEG_LIBRARY})
+    target_link_libraries(avifenc avif ${AVIF_PLATFORM_LIBRARIES} PNG::PNG ZLIB::ZLIB ${JPEG_LIBRARIES})
     target_include_directories(avifenc
                                PRIVATE
                                    $<TARGET_PROPERTY:avif,INTERFACE_INCLUDE_DIRECTORIES>
                                    ${CMAKE_CURRENT_SOURCE_DIR}/apps/shared
-                                   ${ZLIB_INCLUDE_DIR}
-                                   ${PNG_PNG_INCLUDE_DIR}
+                                   ${ZLIB_INCLUDE_DIRS}
+                                   ${PNG_INCLUDE_DIRS}
                                    ${JPEG_INCLUDE_DIR})
     add_executable(avifdec
         apps/avifdec.c
@@ -343,15 +320,14 @@ if(AVIF_BUILD_APPS)
     if(AVIF_LOCAL_LIBGAV1)
         set_target_properties(avifdec PROPERTIES LINKER_LANGUAGE "CXX")
     endif()
-    target_link_libraries(avifdec avif ${AVIF_PLATFORM_LIBRARIES} ${ZLIB_LIBRARY} ${PNG_LIBRARY} ${JPEG_LIBRARY})
+    target_link_libraries(avifdec avif ${AVIF_PLATFORM_LIBRARIES} PNG::PNG ZLIB::ZLIB ${JPEG_LIBRARIES})
     target_include_directories(avifdec
                                PRIVATE
                                    $<TARGET_PROPERTY:avif,INTERFACE_INCLUDE_DIRECTORIES>
                                    ${CMAKE_CURRENT_SOURCE_DIR}/apps/shared
-                                   ${ZLIB_INCLUDE_DIR}
-                                   ${PNG_PNG_INCLUDE_DIR}
+                                   ${ZLIB_INCLUDE_DIRS}
+                                   ${PNG_INCLUDE_DIRS}
                                    ${JPEG_INCLUDE_DIR})
-
     if(NOT SKIP_INSTALL_APPS AND NOT SKIP_INSTALL_ALL)
         install(TARGETS avifenc avifdec
             RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
